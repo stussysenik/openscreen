@@ -12,6 +12,9 @@
 
 # <p align="center">OpenScreen</p>
 
+![Demo](demo.gif)
+
+
 <p align="center"><strong>OpenScreen is your free, open-source alternative to Screen Studio (sort of).</strong></p>
 
 If you don't want to pay $29/month for Screen Studio but want a much simpler version that does what most people seem to need, making beautiful product demos and walkthroughs, here's a free-to-use app for you. OpenScreen does not offer all Screen Studio features, but covers the basics well!
