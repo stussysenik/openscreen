@@ -231,6 +231,10 @@ export function registerIpcHandlers(
 
 	ipcMain.handle("select-source", (_, source: SelectedSource) => {
 		selectedSource = source;
+		const mainWin = getMainWindow();
+		if (mainWin && !mainWin.isDestroyed()) {
+			mainWin.webContents.send("selected-source-updated", selectedSource);
+		}
 		const sourceSelectorWin = getSourceSelectorWindow();
 		if (sourceSelectorWin) {
 			sourceSelectorWin.close();

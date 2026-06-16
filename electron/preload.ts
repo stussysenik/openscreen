@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getSelectedSource: () => {
 		return ipcRenderer.invoke("get-selected-source");
 	},
+	onSelectedSourceChange: (callback: (source: ProcessedDesktopSource | null) => void) => {
+		const listener = (_event: Electron.IpcRendererEvent, source: ProcessedDesktopSource | null) =>
+			callback(source);
+		ipcRenderer.on("selected-source-updated", listener);
+		return () => ipcRenderer.removeListener("selected-source-updated", listener);
+	},
 	requestCameraAccess: () => {
 		return ipcRenderer.invoke("request-camera-access");
 	},

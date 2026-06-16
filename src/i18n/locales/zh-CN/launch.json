@@ -20,10 +20,18 @@
 		"loading": "正在加载源...",
 		"screens": "屏幕 ({{count}})",
 		"windows": "窗口 ({{count}})",
-		"defaultSourceName": "屏幕"
+		"defaultSourceName": "屏幕",
+		"windowLabel": "窗口",
+		"displayLabel": "显示器 {{id}}",
+		"empty": "没有可用的源"
 	},
 	"recording": {
 		"selectSource": "请选择要录制的源"
+	},
+	"actions": {
+		"record": "录制",
+		"selectSource": "选择源",
+		"useSource": "使用源"
 	},
 	"language": "语言"
 }

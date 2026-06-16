@@ -20,10 +20,18 @@
 		"loading": "Loading sources...",
 		"screens": "Screens ({{count}})",
 		"windows": "Windows ({{count}})",
-		"defaultSourceName": "Screen"
+		"defaultSourceName": "Screen",
+		"windowLabel": "Window",
+		"displayLabel": "Display {{id}}",
+		"empty": "No sources available"
 	},
 	"recording": {
 		"selectSource": "Please select a source to record"
+	},
+	"actions": {
+		"record": "Record",
+		"selectSource": "Select source",
+		"useSource": "Use source"
 	},
 	"language": "Language"
 }

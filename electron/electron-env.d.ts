@@ -29,6 +29,9 @@ interface Window {
 		openSourceSelector: () => Promise<void>;
 		selectSource: (source: ProcessedDesktopSource) => Promise<ProcessedDesktopSource | null>;
 		getSelectedSource: () => Promise<ProcessedDesktopSource | null>;
+		onSelectedSourceChange: (
+			callback: (source: ProcessedDesktopSource | null) => void,
+		) => () => void;
 		requestCameraAccess: () => Promise<{
 			success: boolean;
 			granted: boolean;

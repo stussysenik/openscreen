@@ -8,6 +8,9 @@ const APP_ROOT = path.join(__dirname, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const RENDERER_DIST = path.join(APP_ROOT, "dist");
 const HEADLESS = process.env["HEADLESS"] === "true";
+const HUD_WINDOW_WIDTH = 560;
+const HUD_WINDOW_HEIGHT = 92;
+const HUD_WINDOW_HEIGHT_EXPANDED = 138;
 
 let hudOverlayWindow: BrowserWindow | null = null;
 
@@ -17,25 +20,42 @@ ipcMain.on("hud-overlay-hide", () => {
 	}
 });
 
-export function createHudOverlayWindow(): BrowserWindow {
+function positionHudOverlayWindow(win: BrowserWindow, height: number) {
 	const primaryDisplay = screen.getPrimaryDisplay();
 	const { workArea } = primaryDisplay;
+	const x = Math.floor(workArea.x + (workArea.width - HUD_WINDOW_WIDTH) / 2);
+	const y = Math.floor(workArea.y + workArea.height - height - 12);
 
-	const windowWidth = 500;
-	const windowHeight = 155;
+	win.setBounds(
+		{
+			x,
+			y,
+			width: HUD_WINDOW_WIDTH,
+			height,
+		},
+		false,
+	);
+}
 
-	const x = Math.floor(workArea.x + (workArea.width - windowWidth) / 2);
-	const y = Math.floor(workArea.y + workArea.height - windowHeight - 5);
+ipcMain.on("hud:setMicrophoneExpanded", (_event, expanded: boolean) => {
+	if (!hudOverlayWindow || hudOverlayWindow.isDestroyed()) {
+		return;
+	}
 
+	positionHudOverlayWindow(
+		hudOverlayWindow,
+		expanded ? HUD_WINDOW_HEIGHT_EXPANDED : HUD_WINDOW_HEIGHT,
+	);
+});
+
+export function createHudOverlayWindow(): BrowserWindow {
 	const win = new BrowserWindow({
-		width: windowWidth,
-		height: windowHeight,
-		minWidth: 500,
-		maxWidth: 500,
-		minHeight: 155,
-		maxHeight: 155,
-		x: x,
-		y: y,
+		width: HUD_WINDOW_WIDTH,
+		height: HUD_WINDOW_HEIGHT,
+		minWidth: HUD_WINDOW_WIDTH,
+		maxWidth: HUD_WINDOW_WIDTH,
+		minHeight: HUD_WINDOW_HEIGHT,
+		maxHeight: HUD_WINDOW_HEIGHT_EXPANDED,
 		frame: false,
 		transparent: true,
 		resizable: false,
@@ -56,6 +76,7 @@ export function createHudOverlayWindow(): BrowserWindow {
 	});
 
 	hudOverlayWindow = win;
+	positionHudOverlayWindow(win, HUD_WINDOW_HEIGHT);
 
 	win.on("closed", () => {
 		if (hudOverlayWindow === win) {
@@ -124,12 +145,14 @@ export function createSourceSelectorWindow(): BrowserWindow {
 	const { width, height } = screen.getPrimaryDisplay().workAreaSize;
 
 	const win = new BrowserWindow({
-		width: 620,
-		height: 420,
-		minHeight: 350,
-		maxHeight: 500,
-		x: Math.round((width - 620) / 2),
-		y: Math.round((height - 420) / 2),
+		width: 760,
+		height: 560,
+		minWidth: 760,
+		maxWidth: 760,
+		minHeight: 560,
+		maxHeight: 560,
+		x: Math.round((width - 760) / 2),
+		y: Math.round((height - 560) / 2),
 		frame: false,
 		resizable: false,
 		alwaysOnTop: true,

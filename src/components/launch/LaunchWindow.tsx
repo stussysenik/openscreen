@@ -56,15 +56,6 @@ function getIcon(name: IconName, className?: string) {
 	return <Icon size={size} className={className} />;
 }
 
-const hudGroupClasses =
-	"flex items-center gap-0.5 bg-white/5 rounded-full transition-colors duration-150 hover:bg-white/[0.08]";
-
-const hudIconBtnClasses =
-	"flex items-center justify-center p-2 rounded-full transition-all duration-150 cursor-pointer text-white hover:bg-white/10 hover:scale-[1.08] active:scale-95";
-
-const windowBtnClasses =
-	"flex items-center justify-center p-2 rounded-full transition-all duration-150 cursor-pointer opacity-50 hover:opacity-90 hover:bg-white/[0.08]";
-
 export function LaunchWindow() {
 	const t = useScopedT("launch");
 	const { locale, setLocale } = useI18n();
@@ -137,24 +128,41 @@ export function LaunchWindow() {
 	const [hasSelectedSource, setHasSelectedSource] = useState(false);
 
 	useEffect(() => {
-		const checkSelectedSource = async () => {
-			if (window.electronAPI) {
-				const source = await window.electronAPI.getSelectedSource();
-				if (source) {
-					setSelectedSource(source.name);
-					setHasSelectedSource(true);
-				} else {
-					setSelectedSource("Screen");
-					setHasSelectedSource(false);
-				}
+		let mounted = true;
+
+		const syncSelectedSource = async () => {
+			const source = await window.electronAPI?.getSelectedSource();
+			if (!mounted) {
+				return;
 			}
+
+			if (source) {
+				setSelectedSource(source.name);
+				setHasSelectedSource(true);
+				return;
+			}
+
+			setSelectedSource(t("sourceSelector.defaultSourceName"));
+			setHasSelectedSource(false);
 		};
 
-		checkSelectedSource();
+		void syncSelectedSource();
+		const cleanup = window.electronAPI?.onSelectedSourceChange?.((source) => {
+			if (source) {
+				setSelectedSource(source.name);
+				setHasSelectedSource(true);
+				return;
+			}
 
-		const interval = setInterval(checkSelectedSource, 500);
-		return () => clearInterval(interval);
-	}, []);
+			setSelectedSource(t("sourceSelector.defaultSourceName"));
+			setHasSelectedSource(false);
+		});
+
+		return () => {
+			mounted = false;
+			cleanup?.();
+		};
+	}, [t]);
 
 	const openSourceSelector = () => {
 		if (window.electronAPI) {
@@ -198,41 +206,32 @@ export function LaunchWindow() {
 		}
 	};
 
-	return (
-		<div className="w-full h-full flex items-end justify-center bg-transparent relative">
-			{/* Language switcher — top-left, beside traffic lights */}
-			<div
-				className={`absolute top-2 flex items-center gap-1 px-2 py-1 rounded-md text-white/50 hover:text-white/90 hover:bg-white/10 transition-all duration-150 ${isMac ? "left-[72px]" : "left-2"} ${styles.electronNoDrag}`}
-			>
-				<Languages size={14} />
-				<select
-					value={locale}
-					onChange={(e) => setLocale(e.target.value as Locale)}
-					className="bg-transparent text-[11px] font-medium outline-none cursor-pointer appearance-none pr-1"
-					style={{ color: "inherit" }}
-				>
-					{SUPPORTED_LOCALES.map((loc) => (
-						<option key={loc} value={loc} className="bg-[#1c1c24] text-white">
-							{getLocaleName(loc)}
-						</option>
-					))}
-				</select>
-			</div>
+	useEffect(() => {
+		window.electronAPI?.setMicrophoneExpanded(showMicControls);
+	}, [showMicControls]);
 
-			<div className={`flex flex-col items-center gap-2 mx-auto ${styles.electronDrag}`}>
-				{/* Mic controls panel */}
+	const recordLabel = recording
+		? formatTimePadded(elapsed)
+		: hasSelectedSource
+			? t("actions.record")
+			: t("actions.selectSource");
+
+	return (
+		<div className={styles.root}>
+			<div className={`${styles.stack} ${styles.electronDrag}`}>
 				{showMicControls && (
-					<div
-						className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-[rgba(28,28,36,0.97)] to-[rgba(18,18,26,0.96)] backdrop-blur-[16px] backdrop-saturate-[140%] border border-[rgba(80,80,120,0.25)] rounded-2xl shadow-mic-panel animate-mic-panel-in ${styles.electronNoDrag}`}
-					>
-						<div className="relative flex-1" style={{ maxWidth: "70%" }}>
+					<div className={`${styles.micPanel} ${styles.electronNoDrag}`}>
+						<div className={styles.micPanelLabel} title={t("audio.disableMicrophone")}>
+							{getIcon("micOn", styles.micPanelIcon)}
+						</div>
+						<div className={styles.micSelectWrap}>
 							<select
 								value={microphoneDeviceId || selectedDeviceId}
 								onChange={(e) => {
 									setSelectedDeviceId(e.target.value);
 									setMicrophoneDeviceId(e.target.value);
 								}}
-								className="w-full appearance-none bg-white/10 text-white text-xs rounded-full pl-3 pr-7 py-2 border border-white/20 outline-none truncate"
+								className={styles.micSelect}
 							>
 								{devices.map((device) => (
 									<option key={device.deviceId} value={device.deviceId}>
@@ -240,143 +239,165 @@ export function LaunchWindow() {
 									</option>
 								))}
 							</select>
-							<ChevronDown
-								size={14}
-								className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 pointer-events-none"
-							/>
+							<ChevronDown size={12} className={styles.micSelectChevron} />
 						</div>
-						<AudioLevelMeter level={level} className="w-24 h-4" />
+						<AudioLevelMeter level={level} className={styles.micMeter} />
 					</div>
 				)}
 
-				{/* Main pill bar */}
-				<div className="flex items-center gap-1.5 px-2 py-1.5 isolate rounded-full shadow-hud-bar bg-gradient-to-br from-[rgba(28,28,36,0.97)] to-[rgba(18,18,26,0.96)] backdrop-blur-[16px] backdrop-saturate-[140%] border border-[rgba(80,80,120,0.25)]">
-					{/* Drag handle */}
-					<div className={`flex items-center px-1 ${styles.electronDrag}`}>
-						{getIcon("drag", "text-white/30")}
+				<div className={styles.hud}>
+					<div className={styles.leftRail}>
+						<div className={`${styles.dragHandle} ${styles.electronDrag}`}>
+							{getIcon("drag", styles.dragIcon)}
+						</div>
+
+						<button
+							className={`${styles.sourceButton} ${styles.electronNoDrag}`}
+							onClick={openSourceSelector}
+							disabled={recording}
+							title={selectedSource}
+						>
+							<div className={styles.sourceLead}>
+								{getIcon("monitor", styles.sourceIcon)}
+								<div className={styles.sourceText}>
+									<span className={styles.sourceName}>{selectedSource}</span>
+									<span className={styles.sourceHint}>
+										{hasSelectedSource ? t("actions.record") : t("actions.selectSource")}
+									</span>
+								</div>
+							</div>
+							<ChevronDown size={14} className={styles.sourceChevron} />
+						</button>
 					</div>
 
-					{/* Source selector */}
-					<button
-						className={`${hudGroupClasses} p-2 ${styles.electronNoDrag}`}
-						onClick={openSourceSelector}
-						disabled={recording}
-						title={selectedSource}
-					>
-						{getIcon("monitor", "text-white/80")}
-						<span className="text-white/70 text-[11px] max-w-[72px] truncate">
-							{selectedSource}
-						</span>
-					</button>
-
-					{/* Audio controls group */}
-					<div className={`${hudGroupClasses} ${styles.electronNoDrag}`}>
-						<button
-							className={`${hudIconBtnClasses} ${systemAudioEnabled ? "drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]" : ""}`}
-							onClick={() => !recording && setSystemAudioEnabled(!systemAudioEnabled)}
-							disabled={recording}
-							title={
+					<div className={`${styles.toggleRail} ${styles.electronNoDrag}`}>
+						<Tooltip
+							content={
 								systemAudioEnabled ? t("audio.disableSystemAudio") : t("audio.enableSystemAudio")
 							}
 						>
-							{systemAudioEnabled
-								? getIcon("volumeOn", "text-green-400")
-								: getIcon("volumeOff", "text-white/40")}
-						</button>
-						<button
-							className={`${hudIconBtnClasses} ${microphoneEnabled ? "drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]" : ""}`}
-							onClick={toggleMicrophone}
-							disabled={recording}
-							title={microphoneEnabled ? t("audio.disableMicrophone") : t("audio.enableMicrophone")}
+							<button
+								className={`${styles.toggleButton} ${systemAudioEnabled ? styles.toggleButtonActive : ""}`}
+								onClick={() => !recording && setSystemAudioEnabled(!systemAudioEnabled)}
+								disabled={recording}
+								aria-pressed={systemAudioEnabled}
+							>
+								{systemAudioEnabled
+									? getIcon("volumeOn", styles.toggleIconActive)
+									: getIcon("volumeOff", styles.toggleIcon)}
+							</button>
+						</Tooltip>
+						<Tooltip
+							content={
+								microphoneEnabled ? t("audio.disableMicrophone") : t("audio.enableMicrophone")
+							}
 						>
-							{microphoneEnabled
-								? getIcon("micOn", "text-green-400")
-								: getIcon("micOff", "text-white/40")}
-						</button>
-						<button
-							className={`${hudIconBtnClasses} ${webcamEnabled ? "drop-shadow-[0_0_4px_rgba(74,222,128,0.4)]" : ""}`}
-							onClick={async () => {
-								await setWebcamEnabled(!webcamEnabled);
-							}}
-							title={webcamEnabled ? t("webcam.disableWebcam") : t("webcam.enableWebcam")}
-						>
-							{webcamEnabled
-								? getIcon("webcamOn", "text-green-400")
-								: getIcon("webcamOff", "text-white/40")}
-						</button>
+							<button
+								className={`${styles.toggleButton} ${microphoneEnabled ? styles.toggleButtonActive : ""}`}
+								onClick={toggleMicrophone}
+								disabled={recording}
+								aria-pressed={microphoneEnabled}
+							>
+								{microphoneEnabled
+									? getIcon("micOn", styles.toggleIconActive)
+									: getIcon("micOff", styles.toggleIcon)}
+							</button>
+						</Tooltip>
+						<Tooltip content={webcamEnabled ? t("webcam.disableWebcam") : t("webcam.enableWebcam")}>
+							<button
+								className={`${styles.toggleButton} ${webcamEnabled ? styles.toggleButtonActive : ""}`}
+								onClick={async () => {
+									await setWebcamEnabled(!webcamEnabled);
+								}}
+								aria-pressed={webcamEnabled}
+							>
+								{webcamEnabled
+									? getIcon("webcamOn", styles.toggleIconActive)
+									: getIcon("webcamOff", styles.toggleIcon)}
+							</button>
+						</Tooltip>
 					</div>
 
-					{/* Record/Stop group */}
 					<button
-						className={`flex items-center gap-0.5 rounded-full p-2 transition-colors duration-150 ${styles.electronNoDrag} ${
-							recording ? "animate-record-pulse bg-red-500/10" : "bg-white/5 hover:bg-white/[0.08]"
+						className={`${styles.recordButton} ${styles.electronNoDrag} ${recording ? styles.recordButtonActive : ""} ${
+							!hasSelectedSource && !recording ? styles.recordButtonPending : ""
 						}`}
 						onClick={hasSelectedSource ? toggleRecording : openSourceSelector}
-						disabled={!hasSelectedSource && !recording}
-						style={{ flex: "0 0 auto" }}
 					>
-						{recording ? (
-							<>
-								{getIcon("stop", "text-red-400")}
-								<span className="text-red-400 text-xs font-semibold tabular-nums">
-									{formatTimePadded(elapsed)}
-								</span>
-							</>
-						) : (
-							getIcon("record", hasSelectedSource ? "text-white/80" : "text-white/30")
-						)}
+						<span className={styles.recordIcon}>
+							{recording
+								? getIcon("stop", styles.recordIconActive)
+								: getIcon(
+										"record",
+										hasSelectedSource ? styles.recordIconReady : styles.recordIconMuted,
+									)}
+						</span>
+						<span className={styles.recordLabel}>{recordLabel}</span>
 					</button>
 
-					{/* Restart recording */}
 					{recording && (
 						<Tooltip content={t("tooltips.restartRecording")}>
 							<button
-								className={`${hudIconBtnClasses} ${styles.electronNoDrag}`}
+								className={`${styles.utilityButton} ${styles.electronNoDrag}`}
 								onClick={restartRecording}
 							>
-								{getIcon("restart", "text-white/60")}
+								{getIcon("restart", styles.utilityIcon)}
 							</button>
 						</Tooltip>
 					)}
 
-					{/* Open video file */}
-					<Tooltip content={t("tooltips.openVideoFile")}>
-						<button
-							className={`${hudIconBtnClasses} ${styles.electronNoDrag}`}
-							onClick={openVideoFile}
-							disabled={recording}
+					<div className={styles.utilityRail}>
+						<Tooltip content={t("tooltips.openVideoFile")}>
+							<button
+								className={`${styles.utilityButton} ${styles.electronNoDrag}`}
+								onClick={openVideoFile}
+								disabled={recording}
+							>
+								{getIcon("videoFile", styles.utilityIcon)}
+							</button>
+						</Tooltip>
+						<Tooltip content={t("tooltips.openProject")}>
+							<button
+								className={`${styles.utilityButton} ${styles.electronNoDrag}`}
+								onClick={openProjectFile}
+								disabled={recording}
+							>
+								{getIcon("folder", styles.utilityIcon)}
+							</button>
+						</Tooltip>
+						<div
+							className={`${styles.localeRail} ${styles.electronNoDrag} ${isMac ? styles.localeRailMac : ""}`}
+							title={t("language")}
 						>
-							{getIcon("videoFile", "text-white/60")}
-						</button>
-					</Tooltip>
-
-					{/* Open project */}
-					<Tooltip content={t("tooltips.openProject")}>
-						<button
-							className={`${hudIconBtnClasses} ${styles.electronNoDrag}`}
-							onClick={openProjectFile}
-							disabled={recording}
-						>
-							{getIcon("folder", "text-white/60")}
-						</button>
-					</Tooltip>
-
-					{/* Window controls */}
-					<div className={`flex items-center gap-0.5 ${styles.electronNoDrag}`}>
-						<button
-							className={windowBtnClasses}
-							title={t("tooltips.hideHUD")}
-							onClick={sendHudOverlayHide}
-						>
-							{getIcon("minimize", "text-white")}
-						</button>
-						<button
-							className={windowBtnClasses}
-							title={t("tooltips.closeApp")}
-							onClick={sendHudOverlayClose}
-						>
-							{getIcon("close", "text-white")}
-						</button>
+							<Languages size={12} className={styles.localeIcon} />
+							<select
+								value={locale}
+								onChange={(e) => setLocale(e.target.value as Locale)}
+								className={styles.localeSelect}
+							>
+								{SUPPORTED_LOCALES.map((loc) => (
+									<option key={loc} value={loc}>
+										{getLocaleName(loc)}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className={styles.windowRail}>
+							<button
+								className={`${styles.windowButton} ${styles.electronNoDrag}`}
+								title={t("tooltips.hideHUD")}
+								onClick={sendHudOverlayHide}
+							>
+								{getIcon("minimize", styles.windowIcon)}
+							</button>
+							<button
+								className={`${styles.windowButton} ${styles.electronNoDrag}`}
+								title={t("tooltips.closeApp")}
+								onClick={sendHudOverlayClose}
+							>
+								{getIcon("close", styles.windowIcon)}
+							</button>
+						</div>
 					</div>
 				</div>
 			</div>
